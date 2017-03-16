@@ -17,8 +17,6 @@ from PIL import Image
 import zbarlight
 
 
-test_163 = 'http://music.163.com/#/song/462686590?userid=321604998'
-test_youtube = 'https://www.youtube.com/watch?v=k7D4WgwPrE8'
 my_chatid = [123456789]
 my_token = '123456789:abcdefghijklmnopq...'
 send_photo_api = "https://api.telegram.org/bot{}/sendPhoto".format(my_token)
@@ -41,10 +39,7 @@ ipr = '^([0-9]{0,3}\.){3}([0-9]{0,3})$'
 # bot.sendDocument(chat_id=chat_id, document=open('./1. 平行線.lrc', 'rb'))
 # bot.sendPhoto(chat_id=chat_id, photo=open('./t_logo.png', 'rb'))
 
-# >>> send_test_one(50*1024*1024-297)
-# success size 52428503
-# >>> send_test_one(50*1024*1024-296)
-# failed size 52428504
+
 
 
 def send_test(size, test_file_name='./test.bin'):
@@ -327,86 +322,22 @@ def unknown(bot, update):
 def main():
     updater = Updater(token=my_token)
     dp = updater.dispatcher
-
     dp.add_handler(MessageHandler(
         Filters.entity(telegram.MessageEntity.URL), echo))
-
     dp.add_handler(MessageHandler(Filters.photo, deal_qrcode))
-
     dp.add_handler(CommandHandler('photo', cmd_send_photo))
-
     dp.add_handler(CommandHandler('gm5', cmd_gm5, pass_args=True))
-
     dp.add_handler(CommandHandler('gm5re', cmd_gm5_re, pass_args=True))
-
     dp.add_handler(CommandHandler('ping', cmd_ping, pass_args=True))
-
     dp.add_handler(CommandHandler('cmd', cmd_root, pass_args=True))
-
     dp.add_handler(CommandHandler('bilibili', cmd_bilibili, pass_args=True))
-
     dp.add_handler(CommandHandler('cell', cmd_cell_location, pass_args=True))
-
     dp.add_handler(MessageHandler(Filters.command, unknown))
-
     dp.add_error_handler(error)
-
     updater.start_polling()
-
     updater.idle()
 
 if __name__ == '__main__':
     main()
 
-
-updater = Updater(token=my_token)
-dp = updater.dispatcher
-
-dp.add_handler(RegexHandler(ipr, auto_ping))
-
-dp.add_handler(MessageHandler(Filters.entity(
-    telegram.MessageEntity.URL), auto_ping))
-
-dp.add_handler(MessageHandler(Filters.photo, deal_qrcode))
-
-dp.add_handler(CommandHandler('photo', cmd_send_photo))
-
-dp.add_handler(CommandHandler('gm5', cmd_gm5, pass_args=True))
-
-dp.add_handler(CommandHandler('gm5re', cmd_gm5_re, pass_args=True))
-
-dp.add_handler(CommandHandler('ping', cmd_ping, pass_args=True))
-
-dp.add_handler(CommandHandler('cmd', cmd_root, pass_args=True))
-
-dp.add_handler(CommandHandler('bilibili', cmd_bilibili, pass_args=True))
-
-dp.add_handler(CommandHandler('cell', cmd_cell_location, pass_args=True))
-
-dp.add_handler(MessageHandler(Filters.command, unknown))
-
-dp.add_error_handler(error)
-
-updater.start_polling()
-
-
-updater.stop()
-updater, dp = (0, 0)
-
-
-# send photo use api directly
-# def sendImage(path, chat_id=my_chatid[0]):
-#     files = {'photo': open(path, 'rb')}
-#     data = {'chat_id': chat_id}
-#     r = requests.post(send_photo_api, files=files, data=data)
-#     return(r.status_code, r.reason, r.content)
-
-
-# def sendImageRemoteFile(img_url, chat_id):
-#     remote_image = requests.get(img_url)
-#     photo = io.BytesIO(remote_image.content)
-#     files = {'photo': photo}
-#     data = {'chat_id': caht_id}
-#     r = requests.post(send_photo_api, files=files, data=data)
-#     return(r.status_code, r.reason, r.content)
 
