@@ -25,20 +25,13 @@ bilibili_source = 'http://bangumi.bilibili.com/jsonp/seasoninfo/{}.ver?callback=
 cell_location_api = 'http://api.cellocation.com/recell/?lat={}&lon={}&n=10'
 cell_location_res = '_MNC_ : `{}`\n_LAC_ : `{}`\n_CI_ : `{}`\n_LAT_ : `{}`\n_LON_ : `{}`\n_ACC_ : `{}`\n[link]({})'
 
-you_get_head = 'nohup you-get -s 127.0.0.1:1080 -d --no-caption '
-you_get_tail = ' &>> {}.log &'
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger()
 BANNED_CMD = ('vi', 'nload', 'vim', 'top')
 bot = telegram.Bot(my_token)
 chat_id = my_chatid[0]
-
 ipr = '^([0-9]{0,3}\.){3}([0-9]{0,3})$'
-# bot.sendAudio(chat_id=chat_id, audio=open('./1. 平行線.mp3', 'rb'))
-# bot.sendDocument(chat_id=chat_id, document=open('./1. 平行線.lrc', 'rb'))
-# bot.sendPhoto(chat_id=chat_id, photo=open('./t_logo.png', 'rb'))
-
 
 
 
