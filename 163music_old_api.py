@@ -4,7 +4,6 @@ import json
 import hashlib
 import base64
 import binascii
-from Crypto.Cipher import AES
 import requests
 
 def encrypted_id(id):
