@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import os
 import json
@@ -84,7 +86,9 @@ for cookie in session.cookies:
     if cookie.name == '__csrf':
         csrf = cookie.value
     
-
+#目标为http://music.163.com/#/song?id=462686590
+#期望结果应该类似http://m10.music.126.net/20170327202228/e67ae11ae27cd4f5fdeff421be876078/ymusic/9570/2873/76bb/33ba8d1f8c655b9d0be86f33b3080b79.mp3
+#非大陆ip 返回404
 action = 'http://music.163.com/weapi/song/enhance/player/url?csrf_token='
 action += csrf
 music_ids = [462686590]
@@ -92,4 +96,4 @@ text = {'ids': music_ids, 'br': 320000, 'csrf_token': csrf}
 data = encrypted_request(text)
 r = session.post(action, data=data, headers=header)
 result = json.loads(r.text)
-result['data'][0]['url']
+result['data'][0]['url'] 
