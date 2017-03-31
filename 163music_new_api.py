@@ -10,6 +10,17 @@ import binascii
 from Crypto.Cipher import AES
 from http.cookiejar import LWPCookieJar
 import requests
+import requests
+
+#代理 如果出现AssertionError: Not supported proxy scheme socks5
+#可能需要pip install -U requests[socks]
+#参考 http://stackoverflow.com/questions/12601316/how-to-make-python-requests-work-via-socks-proxy
+# url = 'http://httpbin.org/ip'
+# proxies = {
+#     'http': 'socks5://127.0.0.1:1080',
+#     'https': 'socks5://127.0.0.1:1080'
+# }
+# r = requests.get(url, proxies=proxies)
 
 header = {
             'Accept': '*/*',
