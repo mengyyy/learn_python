@@ -10,7 +10,6 @@ import binascii
 from Crypto.Cipher import AES
 from http.cookiejar import LWPCookieJar
 import requests
-import requests
 
 #代理 如果出现AssertionError: Not supported proxy scheme socks5
 #可能需要pip install -U requests[socks]
