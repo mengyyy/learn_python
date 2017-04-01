@@ -106,4 +106,12 @@ text = {'ids': music_ids, 'br': 320000, 'csrf_token': csrf}
 data = encrypted_request(text)
 r = session.post(action, data=data, headers=header)
 result = json.loads(r.text)
-result['data'][0]['url'] 
+mp3_url = result['data'][0]['url'] 
+
+#执行下载
+filePath = './test.mp3'
+dl = session.get(mp3_url, stream=True, timeout=30)
+if dl.status_code == 200:
+        with open(filePath,'wb') as f:
+            for chunk in dl.iter_content(1024):
+                f.write(chunk)
