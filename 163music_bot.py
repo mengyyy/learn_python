@@ -3,29 +3,34 @@
 
 import telegram
 from telegram.ext import Updater
-from telegram.ext import CommandHandler
-from telegram.ext import MessageHandler, Filters
 from telegram.ext import RegexHandler
 import logging
 import requests
 import re
-import os
-import io
-import fnmatch
 import json
 import hashlib
 import base64
-import binascii
-from Crypto.Cipher import AES # pip3 install pycrypto 
 
 test_163 = 'http://music.163.com/#/song/462686590'
 re163 = re.compile(
     '(http://music\.163\.com/(#/)*song)(/)*(\?id=)*(?P<id>\d{1,10})')
-    
-my_token = '12345678:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+header = {
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip,deflate,sdch',
+            'Accept-Language': 'zh-CN,zh;q=0.8,gl;q=0.6,zh-TW;q=0.4',
+            'Connection': 'keep-alive',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Host': 'music.163.com',
+            'Referer': 'http://music.163.com/',
+            'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.152 Safari/537.36'  # NOQA
+        }
+        
+my_token = '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger()
+
 
 def encrypted_id(id):
     magic = bytearray('3go8&$8*3*3h0k(2)2', 'u8')
@@ -71,10 +76,11 @@ def download163(bot, update):
     fid = re163.match(update.message.text).groups()[-1]
     update.message.reply_text('first id is {}'.format(fid))
     getid_then_send_song(bot, update, int(fid))
-    
+
 updater = Updater(token=my_token)
 dp = updater.dispatcher
 dp.add_handler(RegexHandler(re163, download163))
 updater.start_polling()
+
 
     
