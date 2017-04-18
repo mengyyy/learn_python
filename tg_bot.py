@@ -17,7 +17,7 @@ from PIL import Image
 import zbarlight
 
 
-my_chatid = [123456789]
+my_chatid = [1234567890]
 my_token = '123456789:abcdefghijklmnopq...'
 send_photo_api = "https://api.telegram.org/bot{}/sendPhoto".format(my_token)
 bilibili_source = 'http://bangumi.bilibili.com/jsonp/seasoninfo/{}.ver?callback=seasonListCallback'
