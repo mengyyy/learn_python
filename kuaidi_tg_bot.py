@@ -14,7 +14,7 @@ import logging
 my_chatid = [1234567890]
 my_token = '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-code = '440205524883'
+code = '1234567890'
 com_url = 'https://www.kuaidi100.com/autonumber/autoComNum?text={}'
 klog_url = 'https://www.kuaidi100.com/query?type={}&postid={}'
 kuaidi_plan = '时间:*{}*\n`{}`'
