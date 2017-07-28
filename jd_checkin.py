@@ -7,11 +7,6 @@ from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 from telegram.ext import RegexHandler
 import logging
-import requests
-from requests.compat import urljoin, quote_plus
-import cfscrape
-import bs4
-import re
 import time
 import selenium
 from selenium import webdriver
@@ -29,9 +24,6 @@ JD_interval = 7200
 username = 'your login name'
 passwd = 'you jd password'
 
-rss_source = 'https://share.dmhy.org/topics/rss/rss.xml'
-share_html = 'https://share.dmhy.org/'
-
 info_plan = '{}\n<a href="{}">{}</a>\n<i>{}</i>'
 checkin_log_path = '/home/Downloads/dmhy_jd.log'
 screenshot_path = '/root/jd.png'
@@ -48,12 +40,8 @@ login_xpath = '//*[@id="content"]/div/div[1]/div/div[2]'
 username_xpath = '//*[@id="loginname"]'
 passwd_xpath = '//*[@id="nloginpwd"]'
 login_click_xpath = '//*[@id="loginsubmit"]'
-# '//*[@id="indexGuide"]/div/div/div[6]'   //*[@id="viewNew"]
 show_xpath = '//*[@id="viewNew"]'
-show_css_path = 'html body div#indexGuide.guide-wrap div.guide div.w.guide-box div.guide-btn'
-show_css_path2 = 'html body div#indexGuide.guide-wrap div.guide div.w.guide-box div.guide-btn a#viewNew'
 checkin_xpath = '//*[@id="primeWrap"]/div[3]/div[3]/div[1]/a/span'
-checkin_xpath2 = '//*[@id="primeWrap"]/div[3]/div[3]/div[1]/a'
 code_xpath = '//*[@id="code"]'
 submit_code_xpath = '//*[@id="submitBtn"]'
 
@@ -77,109 +65,12 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
-dmhy_log_plan = 'html found {} new has {}'
-dmhy_log_plan_rss = 'rss  found {} new has {}'
-dmhy_sent = []
-dmhy_sent_rss = []
-requests_flare = cfscrape.create_scraper()
-
 def start_driver():
     driver = webdriver.PhantomJS(
         executable_path=phantomjsPath, desired_capabilities=dcap)
     wait = WebDriverWait(driver, 30)
     driver.set_window_size(1280, 1024)
     return driver, wait
-
-
-def deal_dmhy():
-    req = requests_flare.get(share_html)
-    bsObj = bs4.BeautifulSoup(req.text, 'html.parser')
-    tagg = bsObj.find('tbody')
-    tr_list = bsObj.tbody.findAll('tr')
-    dl_list = []
-    for tr in tr_list:
-        a_list = tr.find('td', {'class': "title"}).findAll('a')
-        if len(a_list) > 1:
-            sub_info = a_list[0]
-            sub_id = sub_info.attrs['href'].split('/')[-1]
-            sub_name = re.sub('\s', '', sub_info.text)
-        time = tr.td.span.text
-        dl_info = tr.find('a', {'target': '_blank'})
-        dl_html = urljoin(share_html, dl_info.attrs['href'])
-        dl_name = re.sub('\s', '', dl_info.text)
-        dl_magnet = tr.find(
-            'a', {'class': 'download-arrow arrow-magnet'}).attrs['href']
-        dl_tuple = (time, dl_html, dl_name, dl_magnet[:52])
-        dl_list.append(dl_tuple)
-    return dl_list
-
-
-def deal_dmhy_rss(num=80):
-    req = requests.get(rss_source)
-    bsObj = bs4.BeautifulSoup(req.text, 'xml')
-    tr_list = bsObj.findAll('item')[:num]
-    dl_list_rss = []
-    for tr in tr_list:
-        time = tr.pubDate.text[17:-6]
-        dl_html = tr.link.text
-        dl_name = tr.title.text
-        dl_magnet = tr.enclosure.attrs['url']
-        dl_tuple = (time, dl_html, dl_name, dl_magnet[:52])
-        dl_list_rss.append(dl_tuple)
-    return dl_list_rss
-
-
-def dmhy_do(bot, update):
-    global dmhy_sent
-    global dmhy_sent_rss
-    dl_list = deal_dmhy()
-    dl_list_rss = deal_dmhy_rss()
-    # https://stackoverflow.com/questions/3462143/get-difference-between-two-lists
-    sent_set = set(dmhy_sent)
-    sent_set_rss = set(dmhy_sent_rss)
-    diff_kd_sent = [x for x in dl_list if x not in sent_set]
-    diff_kd_sent_rss = [x for x in dl_list_rss if x not in sent_set_rss]
-    logger.info(dmhy_log_plan.format(len(dl_list), len(diff_kd_sent)))
-    logger.info(dmhy_log_plan_rss.format(
-        len(dl_list_rss), len(diff_kd_sent_rss)))
-    dmhy_sent = dl_list
-    dmhy_sent_rss = dl_list_rss
-    for i in diff_kd_sent:
-        time, dl_html, dl_name, dl_magnet = i
-        result_text = info_plan.format(time, dl_html,
-                                       dl_name, dl_magnet
-                                       )
-        bot.send_message(chat_id=chat_id,
-                         text=result_text,
-                         parse_mode=telegram.ParseMode.HTML,
-                         disable_web_page_preview=True)
-    for i in diff_kd_sent_rss:
-        time, dl_html, dl_name, dl_magnet = i
-        result_text = info_plan.format(time, dl_html,
-                                       dl_name, dl_magnet
-                                       )
-        bot.send_message(chat_id=chat_id,
-                         text=result_text,
-                         parse_mode=telegram.ParseMode.HTML,
-                         disable_web_page_preview=True)
-
-
-def callback_dmhy(bot, update, job_queue, args):
-    if len(args) < 1:
-        args = ['start']
-    logger.info('dmhy args is {}'.format(args[0]))
-    chat_id = update.message.chat_id
-    if args[0] == 'start':
-        logger.info('start dmhy')
-        bot.send_message(chat_id=chat_id,
-                         text='dmhy start')
-        job_queue.run_repeating(dmhy_do, 60, 2)
-    if args[0] == 'stop':
-        logger.info('stop dmhy')
-        try:
-            job_queue.schedule_removal()
-        except Exception as e:
-            logger.error(e)
 
 
 # jd check in start
@@ -336,14 +227,11 @@ def callback_jd(bot, update, job_queue, args):
 
 updater = Updater(token=my_token)
 dp = updater.dispatcher
-dp.add_handler(CommandHandler('dmhy', callback_dmhy,
-                              pass_args=True, pass_job_queue=True))
 dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
 dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
 dp.add_handler(CommandHandler('jdc', callback_jd,
                               pass_args=True, pass_job_queue=True))
 updater.start_polling()
-
 updater.idle()
 
 # updater.stop()
