@@ -6,8 +6,10 @@ from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 from telegram.ext import RegexHandler
+from telegram.ext import BaseFilter
 import logging
 import cfscrape  # apt-get install nodejs pip3 install cfscrape pycrypto
+from requests.compat import urljoin
 import bs4
 import re
 import os
@@ -18,8 +20,34 @@ my_chatid = [1234567890]
 my_token = '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 ARIA2_TOKEN = 'aria_token'
 
-re_dmhy = re.compile('http://share\.dmhy\.org/topics/view/.*html')
+log_path = '/home/tg_aria2_bot.log'
+logger = logging.getLogger('tg_aria2_bot')
+logger.setLevel(logging.DEBUG)
+
+fh = logging.FileHandler(log_path)
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+# create formatter and add it to the handlers
+formatter = logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+re_dmhy = re.compile('https?://share\.dmhy\.org/topics/view/.*html')
 re_magnet = re.compile('magnet:\?.*')
+re_torrent = re.compile('https?://.*\.torrent')
+re_nyaa = re.compile('https?://nyaa\.si/view/.*')
+
+
+dmhy_url_re = re.compile('http://share\.dmhy\.org/topics/view/.*\.html')
+magnet_dict = ('a', {'href': re.compile('magnet:\?.*')})
+torrent_dict = ('a', {'href': re.compile('.*\.torrent')})
+dmhy_reply_plan = 'torrent link : {}\nmagent link 1: {}\nmagent link 2: {}'
 
 header = {
             'Accept': '*/*',
@@ -33,15 +61,46 @@ header = {
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.152 Safari/537.36'  # NOQA
         }
 
+requests_flare = cfscrape.create_scraper()
 
 
+class DMHY_Filter(BaseFilter):
+    def filter(self, message):
+        return dmhy_url_re.match(message.entities[0].url)
 
-def get_torrent_link(url):
+
+dmhy_filter = DMHY_Filter()
+
+
+def get_info_from_html(url, target_dict=('a', {'class': 'magnet'})):
     req = requests_flare.get(url)
-    bsObj = bs4.BeautifulSoup(req.text, 'html.parser')
-    taga = bsObj.find('a', href=re.compile('.*\.torrent'))
+    bso = bs4.BeautifulSoup(req.content, 'html.parser')
+    result = bso.findAll(*target_dict)
+    return result
+
+
+def get_info_from_source(source, target_dict=('a', {'class': 'magnet'})):
+    bso = bs4.BeautifulSoup(source, 'html.parser')
+    result = bso.findAll(*target_dict)
+    return result
+
+
+def get_dmhy_torrent_link(url):
+    req = requests_flare.get(url)
+    taga = get_info_from_source(
+        req.text, ('a', {'href': re.compile('.*\.torrent')}))[0]
     link = 'http:' + taga['href']
-    logger.info('torrent link is  {}'.format(link))
+    logger.info('dmhy torrent link is  {}'.format(link))
+    return link
+
+
+def get_nyaa_link(url):
+    req = requests_flare.get(url)
+    magnet_href = get_info_from_source(req.text, ('a', {'href': re_magnet}))[0]
+    link = magnet_href['href']
+    # torrent_href = bsObj.find('a', href=re.compile('.*\.torrent'))
+    # torrent_link = urljoin(url,torrent_href)
+    logger.info('nyaa link is  {}'.format(link))
     return link
 
 
@@ -58,12 +117,23 @@ def add_mission_2aria2(link):
     return c
 
 # share dmhy org
+
+
 def dmhy_deal(bot, update):
     logger.info('share_dmhy url {}'.format(update.message.text))
     url = update.message.text
-    link = get_torrent_link(url)
-    c = add_mission_2aria2(link)
-    gid = c.json()['result']
+    link = get_dmhy_torrent_link(url)
+    gid = add_mission_2aria2(link).json()['result']
+    update.message.reply_text('gid is {}'.format(gid))
+    return gid
+
+
+# nyaa.si
+def nyaa_deal(bot, update):
+    logger.info('nyaa_si url {}'.format(update.message.text))
+    url = update.message.text
+    link = get_nyaa_link(url)
+    gid = add_mission_2aria2(link).json()['result']
     update.message.reply_text('gid is {}'.format(gid))
     return gid
 
@@ -71,8 +141,25 @@ def dmhy_deal(bot, update):
 def magnet_deal(bot, update):
     logger.info('magnet link {}'.format(update.message.text))
     magnet_link = update.message.text
-    c = add_mission_2aria2(magnet_link)
-    gid = c.json()['result']
+    gid = add_mission_2aria2(link).json()['result']
+    update.message.reply_text('gid is {}'.format(gid))
+    return gid
+
+
+def torrent_deal(bot, update):
+    logger.info('torrent link {}'.format(update.message.text))
+    torrent_link = update.message.text
+    gid = add_mission_2aria2(link).json()['result']
+    update.message.reply_text('gid is {}'.format(gid))
+    return gid
+
+
+def dmhy_trans_form_deal(bot, update):
+    logger.info('trans from {}'.format(update.message.chat_id))
+    dmhy_url = update.message.entities[0].url
+    ml = get_info_from_html(dmhy_url, magnet_dict)
+    magnet_list = [i.attrs['href'] for i in ml]
+    gid = add_mission_2aria2(magnet_list[0]).json()['result']
     update.message.reply_text('gid is {}'.format(gid))
     return gid
 
@@ -125,11 +212,14 @@ def tell_stoped(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id,
                     text=e)
 
-requests_flare = cfscrape.create_scraper()
+
 updater = Updater(token=my_token)
 dp = updater.dispatcher
 dp.add_handler(RegexHandler(re_dmhy, dmhy_deal))
+dp.add_handler(RegexHandler(re_nyaa, nyaa_deal))
 dp.add_handler(RegexHandler(re_magnet, magnet_deal))
+dp.add_handler(RegexHandler(re_torrent, torrent_deal))
+dp.add_handler(MessageHandler(dmhy_filter, dmhy_trans_form_deal))
 dp.add_handler(CommandHandler('tell_active', tell_active))
 dp.add_handler(CommandHandler('tell_stoped', tell_stoped))
 updater.start_polling()
