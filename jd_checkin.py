@@ -204,6 +204,9 @@ while True:
     deal_checkin(driver, wait, bot)
     # 无法解决cpu高占用问题 只能解决出问题的地方了 我国特色
     # https://stackoverflow.com/a/38493285/6819271
-    driver.service.process.send_signal(signal.SIGTERM) 
-    driver.quit()
+    try:
+        driver.service.process.send_signal(signal.SIGTERM) 
+        driver.quit()
+    except:
+        logger.error('driver quit failed')
     time.sleep(checkin_interval)
