@@ -1,53 +1,49 @@
-#! /usr/bin/python3
-# -*- coding:utf-8 -*-
+#!/usr/bin/env python3
+# -*-coding: utf-8-*-
 
-import telegram
-from telegram.ext import Updater
-from telegram.ext import CommandHandler
-from telegram.ext import MessageHandler, Filters
-from telegram.ext import RegexHandler
-import logging
-import time
-import selenium
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
+import telegram
+from telegram.ext import Updater
+from telegram.ext import CommandHandler
+import time
+import logging
+import signal
 
-
-my_chatid = [123456789]
+# 签到间隔
+checkin_interval = 300 
+username = '京东账号'
+passwd = '京东密码'
+# telegram 用户id
+my_chatid = [12345678999]
 chat_id = my_chatid[0]
+# telegram bot token
 my_token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-JD_interval = 7200
-username = 'your login name'
-passwd = 'you jd password'
-
-info_plan = '{}\n<a href="{}">{}</a>\n<i>{}</i>'
-checkin_log_path = '/home/Downloads/dmhy_jd.log'
 screenshot_path = '/root/jd.png'
+checkin_log_path = '/root/checkin_jd.log'
 sms_code = '0'
 
 dcap = dict(DesiredCapabilities.PHANTOMJS)
 dcap["phantomjs.page.settings.userAgent"] = \
     "Mozilla/5.0 (Windows NT 5.1; rv:49.0) Gecko/20100101 Firefox/49.0"
 phantomjsPath = '/root/phantomjs-2.1.1-linux-x86_64/bin/phantomjs'
-
 login_url = 'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fjr.jd.com%2F'
 checkin_url = 'https://jr.jd.com/'
 login_xpath = '//*[@id="content"]/div/div[1]/div/div[2]'
 username_xpath = '//*[@id="loginname"]'
 passwd_xpath = '//*[@id="nloginpwd"]'
 login_click_xpath = '//*[@id="loginsubmit"]'
+
 show_xpath = '//*[@id="viewNew"]'
 checkin_xpath = '//*[@id="primeWrap"]/div[3]/div[3]/div[1]/a/span'
 code_xpath = '//*[@id="code"]'
 submit_code_xpath = '//*[@id="submitBtn"]'
 
-
 # create logger with 'spam_application'
-logger = logging.getLogger('dmhy_jd')
+logger = logging.getLogger('jd_checkin')
 logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
 fh = logging.FileHandler(checkin_log_path)
@@ -65,15 +61,6 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
-def start_driver():
-    driver = webdriver.PhantomJS(
-        executable_path=phantomjsPath, desired_capabilities=dcap)
-    wait = WebDriverWait(driver, 30)
-    driver.set_window_size(1280, 1024)
-    return driver, wait
-
-
-# jd check in start
 def send_screenshot(bot, driver):
     try:
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
@@ -104,10 +91,9 @@ def get_sms_code(bot, update, args):
 
 
 def get_checkin_log(bot, update, args):
-    bot.send_message(
-        chat_id=chat_id, text='get_checkin_log args {}'.format(args))
+    bot.send_message(chat_id=chat_id, text='get_checkin_log args {}'.format(args))    
     with open(checkin_log_path, 'r') as f:
-        data = f.read()[-1000:]
+        data = f.read()[-500:]
     bot.send_message(chat_id=chat_id, text=data)
     bot.send_document(chat_id=chat_id, document=open(checkin_log_path, 'rb'),
                       filename=os.path.basename(checkin_log_path))
@@ -189,9 +175,22 @@ def deal_checkin(driver, wait, bot):
         send_screenshot(bot, driver)
 
 
-def jdc_do(bot, update):
+bot = telegram.Bot(my_token)
+updater = Updater(token=my_token)
+dp = updater.dispatcher
+dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
+dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
+updater.start_polling()
+updater.idle()
+# updater.stop()
+# updater, dp = (0, 0)
+
+while True:
+    driver = webdriver.PhantomJS(
+        executable_path=phantomjsPath, desired_capabilities=dcap)
+    wait = WebDriverWait(driver, 30)
+    driver.set_window_size(1280, 1024)
     logger.debug('START (`\./`)')
-    driver, wait = start_driver()
     login_usrpwd(driver, wait, bot)
     if 'safe.jd.com' in driver.current_url:
         logger.debug('need sms code')
@@ -203,37 +202,8 @@ def jdc_do(bot, update):
         deal_jump_show(driver, wait, bot)
     time.sleep(5)
     deal_checkin(driver, wait, bot)
+    # 无法解决cpu高占用问题 只能解决出问题的地方了 我国特色
+    # https://stackoverflow.com/a/38493285/6819271
+    driver.service.process.send_signal(signal.SIGTERM) 
     driver.quit()
-
-
-def callback_jd(bot, update, job_queue, args):
-    if len(args) < 1:
-        args = ['start']
-    logger.info('callback_jd args is {}'.format(args[0]))
-    chat_id = update.message.chat_id
-    if args[0] == 'start':
-        logger.info('start jd check in')
-        bot.send_message(chat_id=chat_id,
-                         text='jd check in start')
-        job_queue.run_repeating(jdc_do, JD_interval, 2)
-    if args[0] == 'stop':
-        logger.info('stop jd check in')
-        try:
-            job_queue.schedule_removal()
-        except Exception as e:
-            logger.error(e)
-# jd check in end
-
-
-updater = Updater(token=my_token)
-dp = updater.dispatcher
-dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
-dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
-dp.add_handler(CommandHandler('jdc', callback_jd,
-                              pass_args=True, pass_job_queue=True))
-updater.start_polling()
-updater.idle()
-
-# updater.stop()
-# updater, dp = (0, 0)
-
+    time.sleep(checkin_interval)
