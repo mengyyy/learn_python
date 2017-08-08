@@ -61,6 +61,15 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
+def start_driver():
+    driver = webdriver.PhantomJS(
+        executable_path=phantomjsPath, desired_capabilities=dcap)
+    wait = WebDriverWait(driver, 30)
+    driver.set_window_size(1280, 1024)
+    return driver, wait
+
+
+# jd check in start
 def send_screenshot(bot, driver):
     try:
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
@@ -91,9 +100,10 @@ def get_sms_code(bot, update, args):
 
 
 def get_checkin_log(bot, update, args):
-    bot.send_message(chat_id=chat_id, text='get_checkin_log args {}'.format(args))    
+    bot.send_message(
+        chat_id=chat_id, text='get_checkin_log args {}'.format(args))
     with open(checkin_log_path, 'r') as f:
-        data = f.read()[-500:]
+        data = f.read()[-1000:]
     bot.send_message(chat_id=chat_id, text=data)
     bot.send_document(chat_id=chat_id, document=open(checkin_log_path, 'rb'),
                       filename=os.path.basename(checkin_log_path))
@@ -175,21 +185,8 @@ def deal_checkin(driver, wait, bot):
         send_screenshot(bot, driver)
 
 
-bot = telegram.Bot(my_token)
-updater = Updater(token=my_token)
-dp = updater.dispatcher
-dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
-dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
-updater.start_polling()
-updater.idle()
-# updater.stop()
-# updater, dp = (0, 0)
-
-while True:
-    driver = webdriver.PhantomJS(
-        executable_path=phantomjsPath, desired_capabilities=dcap)
-    wait = WebDriverWait(driver, 30)
-    driver.set_window_size(1280, 1024)
+def jdc_do(bot, update):
+    driver, wait = start_driver()
     logger.debug('START (`\./`)')
     login_usrpwd(driver, wait, bot)
     if 'safe.jd.com' in driver.current_url:
@@ -202,11 +199,67 @@ while True:
         deal_jump_show(driver, wait, bot)
     time.sleep(5)
     deal_checkin(driver, wait, bot)
-    # 无法解决cpu高占用问题 只能解决出问题的地方了 我国特色
-    # https://stackoverflow.com/a/38493285/6819271
     try:
-        driver.service.process.send_signal(signal.SIGTERM) 
+        driver.service.process.send_signal(signal.SIGKILL)
         driver.quit()
     except:
         logger.error('driver quit failed')
-    time.sleep(checkin_interval)
+
+
+def callback_jd(bot, update, args, job_queue, chat_data):
+    # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Extensions-%E2%80%93-JobQueue
+    if len(args) < 1:
+        args = [str(JDC_INTERVAL)]
+    logger.info('callback_jd args is {}'.format(args[0]))
+    um_chat_id = update.message.chat_id
+    if args[0] == 'stop':
+        logger.info('try stop jd check in ')
+        try:
+            job = chat_data['job']
+            job.schedule_removal()
+            del chat_data['job']
+        except Exception as e:
+            logger.error('fail stop job {}'.format(repr(e)))
+        else:
+            logger.info('stop job successed')
+            bot.send_message(chat_id=um_chat_id,
+                             text='stop job successed')
+    else:
+        try:
+            job_interval = int(args[0])
+            if job_interval < 60:
+                bot.send_message(chat_id=um_chat_id,
+                                 text='喵？喵？喵？ >=60S')
+                job_interval = 60
+        except:
+            bot.send_message(chat_id=um_chat_id,
+                             text='interval arg error')
+        else:
+            if 'job' not in chat_data.keys():
+                job = job_queue.run_repeating(jdc_do, job_interval, 2)
+                chat_data['job'] = job
+                logger.info(
+                    'creat a new jdc_do job with interval {} S'.format(job_interval))
+            else:
+                job = chat_data['job']
+                job.interval = job_interval
+                logger.info('jdc_do job interval is {} S'.format(job_interval))
+
+# jd check in end
+
+def unknown(bot, update):
+    bot.sendMessage(chat_id=update.message.chat_id,
+                    text="Didn't understand that command.\n"
+                    "Maybe you need a space between command and its args.")
+
+
+updater = Updater(token=my_token)
+dp = updater.dispatcher
+dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
+dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
+dp.add_handler(CommandHandler('jdc', callback_jd,
+                              pass_args=True,
+                              pass_job_queue=True,
+                              pass_chat_data=True))
+dp.add_handler(MessageHandler(Filters.command, unknown))
+updater.start_polling()
