@@ -1,35 +1,37 @@
-#!/usr/bin/env python3
-# -*-coding: utf-8-*-
+#! /usr/bin/python3
+# -*- coding:utf-8 -*-
 
+import telegram
+from telegram.ext import Updater
+from telegram.ext import CommandHandler
+from telegram.ext import MessageHandler, Filters
+from telegram.ext import RegexHandler
+import logging
+import time
+import selenium
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import telegram
-from telegram.ext import Updater
-from telegram.ext import CommandHandler
-import time
-import logging
 import signal
 
-# 签到间隔
-checkin_interval = 300 
-username = '京东账号'
-passwd = '京东密码'
-# telegram 用户id
-my_chatid = [12345678999]
+my_chatid = [1234567890]
 chat_id = my_chatid[0]
-# telegram bot token
-my_token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+my_token = '1234567890:ABCDEFGHIJKLMNOPQQRSTUVWXYZ'
+JDC_INTERVAL = 300
+
+checkin_log_path = '/home/Downloads/jd_jdc.log'
 screenshot_path = '/root/jd.png'
-checkin_log_path = '/root/checkin_jd.log'
 sms_code = '0'
 
 dcap = dict(DesiredCapabilities.PHANTOMJS)
 dcap["phantomjs.page.settings.userAgent"] = \
     "Mozilla/5.0 (Windows NT 5.1; rv:49.0) Gecko/20100101 Firefox/49.0"
 phantomjsPath = '/root/phantomjs-2.1.1-linux-x86_64/bin/phantomjs'
+
+username = 'username'
+passwd = 'passwwd'
 login_url = 'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fjr.jd.com%2F'
 checkin_url = 'https://jr.jd.com/'
 login_xpath = '//*[@id="content"]/div/div[1]/div/div[2]'
@@ -39,25 +41,24 @@ login_click_xpath = '//*[@id="loginsubmit"]'
 
 show_xpath = '//*[@id="viewNew"]'
 checkin_xpath = '//*[@id="primeWrap"]/div[3]/div[3]/div[1]/a/span'
+
 code_xpath = '//*[@id="code"]'
 submit_code_xpath = '//*[@id="submitBtn"]'
 
-# create logger with 'spam_application'
+
 logger = logging.getLogger('jd_checkin')
 logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
-fh = logging.FileHandler(checkin_log_path)
-fh.setLevel(logging.DEBUG)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-# create formatter and add it to the handlers
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+fh = logging.FileHandler(checkin_log_path)
+fh.setLevel(logging.DEBUG)
 fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-# add the handlers to the logger
 logger.addHandler(fh)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
@@ -69,7 +70,6 @@ def start_driver():
     return driver, wait
 
 
-# jd check in start
 def send_screenshot(bot, driver):
     try:
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
@@ -245,21 +245,24 @@ def callback_jd(bot, update, args, job_queue, chat_data):
                 job.interval = job_interval
                 logger.info('jdc_do job interval is {} S'.format(job_interval))
 
-# jd check in end
 
 def unknown(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id,
                     text="Didn't understand that command.\n"
                     "Maybe you need a space between command and its args.")
 
+def main():
+    updater = Updater(token=my_token)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
+    dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
+    dp.add_handler(CommandHandler('jdc', callback_jd,
+                                  pass_args=True,
+                                  pass_job_queue=True,
+                                  pass_chat_data=True))
+    dp.add_handler(MessageHandler(Filters.command, unknown))
+    updater.start_polling()
+    updater.idle()
 
-updater = Updater(token=my_token)
-dp = updater.dispatcher
-dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
-dp.add_handler(CommandHandler('log', get_checkin_log, pass_args=True))
-dp.add_handler(CommandHandler('jdc', callback_jd,
-                              pass_args=True,
-                              pass_job_queue=True,
-                              pass_chat_data=True))
-dp.add_handler(MessageHandler(Filters.command, unknown))
-updater.start_polling()
+if __name__ == '__main__':
+    main()
