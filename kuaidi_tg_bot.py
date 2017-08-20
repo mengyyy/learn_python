@@ -164,3 +164,4 @@ if __name__ == '__main__':
                                   pass_job_queue=True))
     dp.add_error_handler(error)
     updater.start_polling()
+    updater.idle()
