@@ -1,28 +1,36 @@
 #! /usr/bin/python3
 # -*- coding:utf-8 -*-
-# 用法bot内 `/kuaidi 单号`
+# 用法bot内 `/kd 单号1 单号2 ... 单号n`
 
-import requests
-from requests.compat import urljoin, quote_plus
 import telegram
 from telegram.ext import Updater
+from telegram.ext import MessageHandler, Filters
 from telegram.ext import CommandHandler
-from telegram.ext import Job
+import requests
 import logging
+import pprint
+import time
+import bs4
 
+my_token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-my_chatid = [1234567890]
-my_token = '1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_file_enable = False
 
-code = '1234567890'
-com_url = 'https://www.kuaidi100.com/autonumber/autoComNum?text={}'
-klog_url = 'https://www.kuaidi100.com/query?type={}&postid={}'
-kuaidi_plan = '时间:*{}*\n`{}`'
-sent_dict = {}
+if log_file_enable:
+    log_path = './{}.log'.format(__name__)
+    fh = logging.FileHandler(log_path)
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger()
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 # debug
 # bot = telegram.Bot(my_token)
@@ -36,44 +44,123 @@ logger = logging.getLogger()
 #                  text='<b>bold</b> <i>italic</i> <a href="http://google.com">link</a>.',
 #                  parse_mode=telegram.ParseMode.HTML)
 
-
-def kuaidi(code):
-    # comCode 快递商家中文拼音名
-    comCode = requests.post(com_url.format(code)).json()['auto'][0]['comCode']
-    klog = requests.get(klog_url.format(comCode, code))
-    kkl  = [(i['time'],i['context']) for i in klog.json()['data']]
-    return kkl
-
-
-def callback_kuaidi_do(bot, job):
-    logger.info('job.context is {}'.format(job.context))
-    sent_list = sent_dict[job.context]
-    kd_list = kuaidi(job.context)
-    # https://stackoverflow.com/questions/3462143/get-difference-between-two-lists
-    sent_set = set(sent_list)
-    diff_kd_sent = [x for x in kd_list if x not in sent_set]
-    for i in diff_kd_sent[::-1]:
-        sent_list.append(i)
-        bot.send_message(chat_id=chat_id,
-                         text=kuaidi_plan.format(*i),
-                         parse_mode=telegram.ParseMode.MARKDOWN)
-    logger.info('total get {} info have sent {}'.format(
-        len(kd_list), len(sent_list)))
-
-
-def callback_kuaidi(bot, update, job_queue, args):
-    logger.info('args is {}'.format(args[0]))
-    sent_dict[args[0]] = []
-    bot.send_message(chat_id=update.message.chat_id,
-                     text='Setting a timer for 1 minute!')
-    job_queue.run_repeating(callback_kuaidi_do, 30, 2, context=args[0])
+class Kuaidi100:
+    """docstring for Kuaidi100"""
+    
+    def __init__(self, code):
+        self.code = str(code)
+        self.com_url = 'https://www.kuaidi100.com'\
+                       '/autonumber/autoComNum?text=' + self.code
+        self.klog_url_plan = 'https://www.kuaidi100.com/'\
+                             'query?type={}&postid=' + self.code
+        self.klog_data_plan = '{ftime} | {location} | {context}'
+        self.klog_data_init()
+        self.com_code_dict = self.get_kuadi_com_dict()
+        try:
+            self.__com_code = requests.post(
+                self.com_url).json()['auto'][0]['comCode']
+        except Exception as e:
+            logger.error('get code company error\n'.format(repr(e)))
+            self.__com_code = 'error'
+        else:
+            self.klog_url = self.klog_url_plan.format(self.__com_code)
+            logger.debug(
+                'code {} company is {}'.format(self.code, self.__com_code))
+    def get_com_code(self):
+        return self.__com_code
+    
+    def set_com_code(self, comCode):
+        self.__com_code = str(comCode)
+        self.klog_url = self.klog_url_plan.format(self.__com_code)
+        self.klog_data_init()
+        self.get_kuaidi_log()
+        
+    com_code = property(get_com_code, set_com_code)
+    
+    def klog_data_init(self):
+        self.klog_data_old = []
+        self.overdue = False 
+        
+    def get_kuaidi_log(self):
+        try:
+            req = requests.get(self.klog_url)
+            self.klog = req.json()
+            self.message = self.klog['message']
+        except Exception as e:
+            logger.error('get kuaidi log error\n{}'.format(repr(e)))
+        else:
+            if self.message == 'ok':
+                self.klog_data_new = [self.klog_data_plan.format(
+                    **i) for i in self.klog['data']]
+                self.klog_data_gen = [
+                    i for i in self.klog_data_new if i not in self.klog_data_old]
+                self.klog_data_old = set(self.klog_data_new)
+                cd = datetime.datetime.now() - datetime.datetime.strptime(
+                    self.klog['data'][0]['ftime'], '%Y-%m-%d %H:%M:%S')
+                if cd.days >= 30:
+                    self.overdue = True                
+                if self.klog_data_gen:
+                    logger.debug('reflash {}'.format(self.klog_data_gen))
+                else:
+                    logger.debug('klog {}'.format(pprint.pformat(self.klog)))
+            else:
+                logger.error('get wrong data {}'.format(self.klog))
+        return self.klog_data_gen, self.klog, self.overdue
+    
+    def get_kuadi_com_dict(self):
+        try:
+            req = requests.get('https://www.kuaidi100.com')
+            bso = bs4.BeautifulSoup(req.content, 'html.parser')
+            com_item = bso.findAll('a', {'data-code': True})
+            iterable = [(i.attrs['data-code'], i.text) for i in com_item]
+            com_code_dict = {key: value for (key, value) in iterable}
+        except Exception as e:
+            logger.error('get com_code list failed {}'.format(repr(e)))
+        return com_code_dict
     
 
-updater = Updater(token=my_token)
-dp = updater.dispatcher
+def kuadi_job(bot, job):
+    chat_id = job.context[0]
+    ksend, klog, overdue = job.context[1].get_kuaidi_log()
+    logger.debug('kuaidi job send {}'.format(ksend))
+    for i in ksend[::-1]:
+        bot.send_message(chat_id=chat_id, text=i)
+    if klog['ischeck'] == '1' or overdue:
+        job.schedule_removal()
+        logger.debug('kuadi job {} over'.format(klog['nu']))
+        if overdue:
+            bot.send_message(chat_id=chat_id, text='{} overdue'.format(klog['nu']))
+        if klog['ischeck'] == '1':
+            bot.send_message(chat_id=chat_id, text='{} checked'.format(klog['nu']))
+        
 
-kuaidi_handler = CommandHandler(
-    'kuaidi', callback_kuaidi, pass_args=True, pass_job_queue=True)
-dp.add_handler(kuaidi_handler)
 
-updater.start_polling()
+def kuaidi_do(bot, update, args, job_queue):
+    logger.debug('kaudi do args {} len {}'.format(args, len(args)))
+    chat_id = update.message.chat_id
+    if len(args) == 0:
+        update.message.reply_text('please use /kd code')
+    else:
+        for i in args:
+            cc = Kuaidi100(i)
+            if cc.com_code != 'error':
+                job_context = (chat_id, cc)
+                job = job_queue.run_repeating(
+                    kuadi_job, 60, 2,
+                    context=job_context)
+            else:
+                update.message.reply_text('get kuadi company code error')
+
+
+def error(bot, update, error):
+    logger.warning('Update "%s" caused error "%s"' % (update, error))
+    
+
+if __name__ == '__main__':
+    updater = Updater(token=my_token)
+    dp = updater.dispatcher
+    dp.add_handler(CommandHandler('kd', kuaidi_do,
+                                  pass_args=True,
+                                  pass_job_queue=True))
+    dp.add_error_handler(error)
+    updater.start_polling()
