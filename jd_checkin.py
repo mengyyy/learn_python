@@ -15,11 +15,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import signal
+import json
 
-my_chatid = [1234567890]
-chat_id = my_chatid[0]
-my_token = '1234567890:ABCDEFGHIJKLMNOPQQRSTUVWXYZ'
-JDC_INTERVAL = 300
+with open('jd-config.json') as data_file:    
+    data = json.load(data_file)
+
+chat_id = data['chat_id']
+my_token = data['my_token']
+JDC_INTERVAL = data['JDC_INTERVAL']
+username = data['username']
+passwd = data['passwd']
+
 
 checkin_log_path = '/home/Downloads/jd_jdc.log'
 screenshot_path = '/root/jd.png'
@@ -30,8 +36,6 @@ dcap["phantomjs.page.settings.userAgent"] = \
     "Mozilla/5.0 (Windows NT 5.1; rv:49.0) Gecko/20100101 Firefox/49.0"
 phantomjsPath = '/root/phantomjs-2.1.1-linux-x86_64/bin/phantomjs'
 
-username = 'username'
-passwd = 'passwwd'
 login_url = 'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fjr.jd.com%2F'
 checkin_url = 'https://jr.jd.com/'
 login_xpath = '//*[@id="content"]/div/div[1]/div/div[2]'
@@ -40,7 +44,7 @@ passwd_xpath = '//*[@id="nloginpwd"]'
 login_click_xpath = '//*[@id="loginsubmit"]'
 
 show_xpath = '//*[@id="viewNew"]'
-checkin_xpath = '//*[@id="primeWrap"]/div[3]/div[3]/div[1]/a/span'
+checkin_xpath = '//*[@id="primeWrap"]/div[1]/div[3]/div[1]/a/span'
 
 code_xpath = '//*[@id="code"]'
 submit_code_xpath = '//*[@id="submitBtn"]'
@@ -68,6 +72,9 @@ def start_driver():
     wait = WebDriverWait(driver, 30)
     driver.set_window_size(1280, 1024)
     return driver, wait
+
+
+driver, wait = start_driver()
 
 
 def send_screenshot(bot, driver):
@@ -186,7 +193,6 @@ def deal_checkin(driver, wait, bot):
 
 
 def jdc_do(bot, update):
-    driver, wait = start_driver()
     logger.debug('START (`\./`)')
     login_usrpwd(driver, wait, bot)
     if 'safe.jd.com' in driver.current_url:
@@ -196,14 +202,10 @@ def jdc_do(bot, update):
         driver.get(checkin_url)
     if 'jr.jd.com' in driver.current_url:
         logger.debug('deal jr.jd.com')
-        deal_jump_show(driver, wait, bot)
+#        deal_jump_show(driver, wait, bot)
     time.sleep(5)
     deal_checkin(driver, wait, bot)
-    try:
-        driver.service.process.send_signal(signal.SIGKILL)
-        driver.quit()
-    except:
-        logger.error('driver quit failed')
+    driver.get('https://www.cs.cmu.edu/~muli/file/')
 
 
 def callback_jd(bot, update, args, job_queue, chat_data):
@@ -211,9 +213,9 @@ def callback_jd(bot, update, args, job_queue, chat_data):
     if len(args) < 1:
         args = [str(JDC_INTERVAL)]
     logger.info('callback_jd args is {}'.format(args[0]))
-    um_chat_id = update.message.chat_id
     if args[0] == 'stop':
         logger.info('try stop jd check in ')
+        update.message.reply_text('try stop jd check in ')
         try:
             job = chat_data['job']
             job.schedule_removal()
@@ -222,28 +224,29 @@ def callback_jd(bot, update, args, job_queue, chat_data):
             logger.error('fail stop job {}'.format(repr(e)))
         else:
             logger.info('stop job successed')
-            bot.send_message(chat_id=um_chat_id,
-                             text='stop job successed')
+            update.message.reply_text('stop job successed')
     else:
         try:
             job_interval = int(args[0])
             if job_interval < 60:
-                bot.send_message(chat_id=um_chat_id,
-                                 text='喵？喵？喵？ >=60S')
+                update.message.reply_text('喵？喵？喵？ >=60S')
                 job_interval = 60
         except:
-            bot.send_message(chat_id=um_chat_id,
-                             text='interval arg error')
+            update.message.reply_text('interval arg error')
         else:
             if 'job' not in chat_data.keys():
                 job = job_queue.run_repeating(jdc_do, job_interval, 2)
                 chat_data['job'] = job
-                logger.info(
-                    'creat a new jdc_do job with interval {} S'.format(job_interval))
+                info = 'creat a new jdc_do job with interval {} S'.format(
+                    job_interval)
+                logger.info(info)
+                update.message.reply_text(info)
             else:
                 job = chat_data['job']
                 job.interval = job_interval
-                logger.info('jdc_do job interval is {} S'.format(job_interval))
+                info = 'jdc_do job interval is {} S'.format(job_interval)
+                logger.info(info)
+                update.message.reply_text(info)
 
 
 def unknown(bot, update):
