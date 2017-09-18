@@ -17,7 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import signal
 import json
 
-with open('jd-config.json') as data_file:    
+with open('jd-config.json') as data_file:
     data = json.load(data_file)
 
 chat_id = data['chat_id']
@@ -87,8 +87,8 @@ def send_screenshot(bot, driver):
             document=open(screenshot_path, 'rb'),
             filename='{}.png'.format(ti),
             caption='{}'.format(ti))
-    except:
-        logger.error('send screen failed')
+    except Exception as e:
+        logger.exception('message')
 
 
 def send_log(logger, bot, st):
@@ -96,8 +96,8 @@ def send_log(logger, bot, st):
     logger.info(st)
     try:
         bot.send_message(chat_id=chat_id, text='{}--{}'.format(ti, st))
-    except BaseException as e:
-        logger.error(str(e))
+    except Exception as e:
+        logger.exception('message')
 
 
 def get_sms_code(bot, update, args):
@@ -205,8 +205,8 @@ def jdc_do(bot, update):
 #        deal_jump_show(driver, wait, bot)
     time.sleep(5)
     deal_checkin(driver, wait, bot)
-    driver.get('https://www.cs.cmu.edu/~muli/file/')
-
+    driver.get('https://www.google.com')
+    driver.delete_all_cookies()
 
 def callback_jd(bot, update, args, job_queue, chat_data):
     # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Extensions-%E2%80%93-JobQueue
@@ -255,6 +255,8 @@ def unknown(bot, update):
                     "Maybe you need a space between command and its args.")
 
 def main():
+    bot = telegram.Bot(my_token)
+    bot.send_message(chat_id=chat_id, text='Send me /jdc to start')
     updater = Updater(token=my_token)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('sms_code', get_sms_code, pass_args=True))
