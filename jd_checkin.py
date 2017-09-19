@@ -82,11 +82,11 @@ def send_screenshot(bot, driver):
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
         driver.save_screenshot(screenshot_path)
         bot.send_photo(chat_id=chat_id, photo=open(screenshot_path, 'rb'))
-        bot.send_document(
-            chat_id=chat_id,
-            document=open(screenshot_path, 'rb'),
-            filename='{}.png'.format(ti),
-            caption='{}'.format(ti))
+#        bot.send_document(
+#            chat_id=chat_id,
+#            document=open(screenshot_path, 'rb'),
+#            filename='{}.png'.format(ti),
+#            caption='{}'.format(ti))
     except Exception as e:
         logger.exception('message')
 
