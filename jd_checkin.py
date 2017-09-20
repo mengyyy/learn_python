@@ -170,8 +170,8 @@ def deal_checkin(driver, wait, bot):
     finally:
         send_log(logger, bot, 'check in finish')
         send_screenshot(bot, driver)
-
-
+        
+        
 def jdc_do(bot, update):
     try:
         driver, wait = start_driver()
@@ -186,11 +186,12 @@ def jdc_do(bot, update):
             logger.debug('deal jr.jd.com')
         time.sleep(5)
         deal_checkin(driver, wait, bot)
-        driver.quit()
+        driver.close()
         del driver
-        subprocess.call(clear_phantomjs_cmd, shell=True)
     except Exception as e:
         logger.exception('message')
+    finally:
+        subprocess.call(clear_phantomjs_cmd, shell=True)
 
 
 def callback_jd(bot, update, args, job_queue, chat_data):
