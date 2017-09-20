@@ -14,6 +14,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import subprocess
 import signal
 import json
 
@@ -65,6 +66,8 @@ ch.setLevel(logging.DEBUG)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+clear_phantomjs_cmd = 'ps ax | grep phantomjs | grep -v grep | cut -c 1-6 | xargs kill -9'
+
 
 def start_driver():
     driver = webdriver.PhantomJS(
@@ -74,19 +77,16 @@ def start_driver():
     return driver, wait
 
 
-driver, wait = start_driver()
-
-
 def send_screenshot(bot, driver):
     try:
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
         driver.save_screenshot(screenshot_path)
         bot.send_photo(chat_id=chat_id, photo=open(screenshot_path, 'rb'))
-#        bot.send_document(
-#            chat_id=chat_id,
-#            document=open(screenshot_path, 'rb'),
-#            filename='{}.png'.format(ti),
-#            caption='{}'.format(ti))
+        bot.send_document(
+            chat_id=chat_id,
+            document=open(screenshot_path, 'rb'),
+            filename='{}.png'.format(ti),
+            caption='{}'.format(ti))
     except Exception as e:
         logger.exception('message')
 
@@ -159,26 +159,6 @@ def deal_sms_code(driver, bot, t=40):
         send_log(logger, bot, str(e))
 
 
-def deal_jump_show(driver, wait, bot):
-    driver.set_window_size(1280, 1024)
-    try:
-        wait.until(EC.presence_of_element_located((By.XPATH, show_xpath)))
-    except:
-        send_log(logger, bot, 'show_xpath failed')
-    finally:
-        send_screenshot(bot, driver)
-    show_cnt = 0
-    while driver.find_elements_by_xpath(show_xpath):
-        logger.debug('found show_xpath')
-        driver.find_element_by_xpath(show_xpath).click()
-        time.sleep(2)
-        show_cnt += 1
-        logger.info('show_xpath click {} times'.format(show_cnt))
-        if show_cnt > 60:
-            send_log(logger, bot, 'click show_xpath too much')
-            break
-
-
 def deal_checkin(driver, wait, bot):
     try:
         wait.until(EC.presence_of_element_located((By.XPATH, checkin_xpath)))
@@ -193,20 +173,25 @@ def deal_checkin(driver, wait, bot):
 
 
 def jdc_do(bot, update):
-    logger.debug('START (`\./`)')
-    login_usrpwd(driver, wait, bot)
-    if 'safe.jd.com' in driver.current_url:
-        logger.debug('need sms code')
-        deal_sms_code(driver, bot)
-    else:
-        driver.get(checkin_url)
-    if 'jr.jd.com' in driver.current_url:
-        logger.debug('deal jr.jd.com')
-#        deal_jump_show(driver, wait, bot)
-    time.sleep(5)
-    deal_checkin(driver, wait, bot)
-    driver.get('https://www.google.com')
-    driver.delete_all_cookies()
+    try:
+        driver, wait = start_driver()
+        logger.debug('START (`\./`)')
+        login_usrpwd(driver, wait, bot)
+        if 'safe.jd.com' in driver.current_url:
+            logger.debug('need sms code')
+            deal_sms_code(driver, bot)
+        else:
+            driver.get(checkin_url)
+        if 'jr.jd.com' in driver.current_url:
+            logger.debug('deal jr.jd.com')
+        time.sleep(5)
+        deal_checkin(driver, wait, bot)
+        driver.quit()
+        del driver
+        subprocess.call(clear_phantomjs_cmd, shell=True)
+    except Exception as e:
+        logger.exception('message')
+
 
 def callback_jd(bot, update, args, job_queue, chat_data):
     # https://github.com/python-telegram-bot/python-telegram-bot/wiki/Extensions-%E2%80%93-JobQueue
@@ -254,6 +239,7 @@ def unknown(bot, update):
                     text="Didn't understand that command.\n"
                     "Maybe you need a space between command and its args.")
 
+
 def main():
     bot = telegram.Bot(my_token)
     bot.send_message(chat_id=chat_id, text='Send me /jdc to start')
@@ -271,3 +257,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
