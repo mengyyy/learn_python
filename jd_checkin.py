@@ -186,7 +186,6 @@ def jdc_do(bot, update):
             logger.debug('deal jr.jd.com')
         time.sleep(5)
         deal_checkin(driver, wait, bot)
-        driver.quit()
         del driver
     except Exception as e:
         logger.exception('message')
