@@ -186,10 +186,11 @@ def jdc_do(bot, update):
             logger.debug('deal jr.jd.com')
         time.sleep(5)
         deal_checkin(driver, wait, bot)
-        del driver
+        driver.dispose()
     except Exception as e:
         logger.exception('message')
     finally:
+        del driver
         subprocess.call(clear_phantomjs_cmd, shell=True)
 
 
