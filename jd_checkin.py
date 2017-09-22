@@ -77,10 +77,14 @@ def start_driver():
     return driver, wait
 
 
-def send_screenshot(bot, driver):
+def send_screenshot(bot, driver, ends=False):
     try:
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
         driver.save_screenshot(screenshot_path)
+        if ends:
+            # https://stackoverflow.com/a/38493285
+            driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
+            driver.quit()                                      # quit the node proc
         bot.send_photo(chat_id=chat_id, photo=open(screenshot_path, 'rb'))
         bot.send_document(
             chat_id=chat_id,
@@ -169,7 +173,7 @@ def deal_checkin(driver, wait, bot):
         send_log(logger, bot, str(e))
     finally:
         send_log(logger, bot, 'check in finish')
-        send_screenshot(bot, driver)
+        send_screenshot(bot, driver, ends=True)
         
         
 def jdc_do(bot, update):
@@ -186,9 +190,6 @@ def jdc_do(bot, update):
             logger.debug('deal jr.jd.com')
         time.sleep(5)
         deal_checkin(driver, wait, bot)
-        # https://stackoverflow.com/a/38493285
-        driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
-        driver.quit()                                      # quit the node proc
     except Exception as e:
         logger.exception('message')
     finally:
