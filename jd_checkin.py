@@ -186,7 +186,9 @@ def jdc_do(bot, update):
             logger.debug('deal jr.jd.com')
         time.sleep(5)
         deal_checkin(driver, wait, bot)
-        driver.dispose()
+        # https://stackoverflow.com/a/38493285
+        driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
+        driver.quit()                                      # quit the node proc
     except Exception as e:
         logger.exception('message')
     finally:
