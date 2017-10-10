@@ -86,7 +86,9 @@ def send_screenshot(bot, driver, ends=False):
             driver.close()
             driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
             driver.quit()                                      # quit the node proc
-        bot.send_photo(chat_id=chat_id, photo=open(screenshot_path, 'rb'))
+        bot.send_photo(chat_id=chat_id, 
+                       photo=open(screenshot_path, 'rb'),
+                       timeout=60)
         bot.send_document(
             chat_id=chat_id,
             document=open(screenshot_path, 'rb'),
