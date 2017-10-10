@@ -83,8 +83,8 @@ def send_screenshot(bot, driver, ends=False):
         driver.save_screenshot(screenshot_path)
         if ends:
             # https://stackoverflow.com/a/38493285
-            driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
             driver.close()
+            driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
             driver.quit()                                      # quit the node proc
         bot.send_photo(chat_id=chat_id, photo=open(screenshot_path, 'rb'))
         bot.send_document(
