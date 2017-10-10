@@ -27,8 +27,8 @@ JDC_INTERVAL = data['JDC_INTERVAL']
 username = data['username']
 passwd = data['passwd']
 
-
-checkin_log_path = '/home/Downloads/jd_jdc.log'
+log_time_str = time.strftime('%Y_%m_%d_%H_%M', time.localtime())
+checkin_log_path = '/home/Downloads/jd_jdc_{}.log'.format(log_time_str)
 screenshot_path = '/root/jd.png'
 sms_code = '0'
 
@@ -90,7 +90,8 @@ def send_screenshot(bot, driver, ends=False):
             chat_id=chat_id,
             document=open(screenshot_path, 'rb'),
             filename='{}.png'.format(ti),
-            caption='{}'.format(ti))
+            caption='{}'.format(ti),
+            timeout=60)
     except Exception as e:
         logger.exception('message')
 
