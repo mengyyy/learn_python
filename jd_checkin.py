@@ -39,7 +39,7 @@ phantomjsPath = '/root/phantomjs-2.1.1-linux-x86_64/bin/phantomjs'
 
 login_url = 'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fjr.jd.com%2F'
 checkin_url = 'https://jr.jd.com/'
-login_xpath = '//*[@id="content"]/div/div[1]/div/div[2]'
+login_xpath = '//*[@id="content"]/div[2]/div[1]/div/div[3]/a'
 username_xpath = '//*[@id="loginname"]'
 passwd_xpath = '//*[@id="nloginpwd"]'
 login_click_xpath = '//*[@id="loginsubmit"]'
