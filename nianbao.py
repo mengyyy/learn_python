@@ -46,24 +46,20 @@ def download_from_url(url):
         req = requests.get(url)
         file_name = file_name_replan.search(
             req.headers['Content-Disposition']).group(1)
+        with open(file_name, 'wb') as f:
+                f.write(req.content)
+        logger.info('downloaded {}'.format(url))
     except:
         logger.exception('requests error in {}'.format(url))
-    else:
-        if file_name:
-            with open(file_name, 'wb') as f:
-                f.write(req.content)
-            logger.info('downloaded {}'.format(url))
 
 
 def download_one(i):
+    # 资产负债表
     download_from_url(m163_plan.format(zlx='zcfzb', num=i))
+    # 利润表
     download_from_url(m163_plan.format(zlx='lrb', num=i))
+    # 现金流量表
     download_from_url(m163_plan.format(zlx='xjllb', num=i))
-
-
-def download_list(ll):
-    for i in ll:
-        download_one(i)
 
 
 if __name__ == '__main__':
