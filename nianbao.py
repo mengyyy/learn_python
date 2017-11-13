@@ -92,4 +92,4 @@ if __name__ == '__main__':
     with concurrent.futures.ThreadPoolExecutor(max_workers=THREAD_NUM) as executor:
         _ = [executor.submit(download_one, i) for i in stock_list]
     end_t = time.time()
-    logger.info('All subprocesses done in {} S'.format(end_t - start_t))
+    logger.info('All done in {} S'.format(end_t - start_t))
