@@ -1,4 +1,4 @@
-#! /bin/usr/python
+#! /usr/bin/python3
 # -*- coding:utf-8 -*-
 # pip3 list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  |
 # xargs -n1 pip3 install -U
