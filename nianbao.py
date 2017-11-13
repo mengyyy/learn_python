@@ -41,7 +41,6 @@ logger.addHandler(ch)
 
 
 def download_from_url(url):
-    file_name = ''
     try:
         req = requests.get(url)
         file_name = file_name_replan.search(
