@@ -5,11 +5,11 @@
 
 import requests
 import re
-import threading
 import logging
 import openpyxl
 import time
 import concurrent.futures
+import os
 
 file_name_replan = re.compile('.*filename=(.*)')
 A_stock_replan = re.compile('\n(6\d{5})\t')
