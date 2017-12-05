@@ -173,7 +173,7 @@ def deal_checkin(driver, wait, bot):
         wait.until(EC.presence_of_element_located((By.XPATH, checkin_xpath)))
         status_text = driver.find_element_by_xpath(checkin_xpath).text
         if status_text == '今日已签':
-            send_log(logger, bot, 'checkined | {}'.foramt(status_text))
+            send_log(logger, bot, 'checkined | {}'.format(status_text))
             return
         driver.find_element_by_xpath(checkin_xpath).click()
         time.sleep(5)
