@@ -147,7 +147,7 @@ def login_usrpwd(driver, wait, bot):
         except BaseException as e:
             send_log(logger, bot, 'login error accourt')
             send_screenshot(bot, driver)
-            send_log(logger, bot, str(e))
+            send_log(logger, bot, repr(e))
         time.sleep(5)
         login_cnt += 1
         if driver.current_url != login_url or login_cnt > 5:
@@ -168,16 +168,22 @@ def deal_sms_code(driver, bot, t=40):
 
 
 def deal_checkin(driver, wait, bot):
+    status_text = ''
     try:
         wait.until(EC.presence_of_element_located((By.XPATH, checkin_xpath)))
+        status_text = driver.find_element_by_xpath(checkin_xpath).text
+        if status_text == '今日已签':
+            send_log(logger, bot, 'checkined | {}'.foramt(status_text))
+            return
         driver.find_element_by_xpath(checkin_xpath).click()
         time.sleep(5)
         driver.find_element_by_xpath(checkin_xpath).click()
     except BaseException as e:
-        send_log(logger, bot, str(e))
+        send_log(logger, bot, repr(e))
     finally:
-        send_log(logger, bot, 'check in finish')
-        send_screenshot(bot, driver, ends=True)
+        if not status_text:
+            send_log(logger, bot, 'check in finish')
+            send_screenshot(bot, driver, ends=True)
         
         
 def jdc_do(bot, update):
