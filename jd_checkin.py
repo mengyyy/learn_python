@@ -172,17 +172,15 @@ def deal_checkin(driver, wait, bot):
     try:
         wait.until(EC.presence_of_element_located((By.XPATH, checkin_xpath)))
         status_text = driver.find_element_by_xpath(checkin_xpath).text
-        if status_text == '今日已签':
-            send_log(logger, bot, 'checkined | {}'.format(status_text))
-            return
+        send_log(logger, bot, 'checkined | {}'.format(status_text))
         driver.find_element_by_xpath(checkin_xpath).click()
         time.sleep(5)
         driver.find_element_by_xpath(checkin_xpath).click()
     except BaseException as e:
         send_log(logger, bot, repr(e))
     finally:
-        if not status_text:
-            send_log(logger, bot, 'check in finish')
+        if status_text != '今日已签':
+            send_log(logger, bot, 'new checkin')
             send_screenshot(bot, driver, ends=True)
         
         
