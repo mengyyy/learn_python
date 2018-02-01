@@ -6,6 +6,7 @@ import base64
 import json
 
 # 浏览器抓包得 chrome f12
+# 结果如图 https://github.com/mengyyy/learn_python/blob/master/image_2018-02-01_16-49-24.png
 # 网页请求地址
 loginUrl = 'http://192.168.2.1/cgi-bin/'
 # 网页请求发送数据 含用户名密码
