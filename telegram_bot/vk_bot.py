@@ -113,6 +113,52 @@ def get_url_from_message(message, refilter=RE_VK_URL):
     return url_list
 
 
+def dealFileWithSqlAndBot(file, file_link, db_path, bot, update):
+    try:
+        file_hash = sha256Checksum(file)
+        connection = sqlite3.connect(db_path)
+        cursor = connection.cursor()
+        cursor.execute(sql_command_chech_hash.format(file_hash))
+        al_file_hash = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        if al_file_hash:
+            os.remove(file)
+            logger.info('already download file | {}'.format(al_file_hash))
+            file_id = al_file_hash[0][0]
+            bot.send_chat_action(chat_id=update.message.chat_id,
+                                 action=telegram.ChatAction.UPLOAD_DOCUMENT)
+            cc = update.message.reply_document(document=file_id,
+                                               timeout=120,
+                                               caption=file)
+            update.message.reply_text(file_id)
+            logger.info('send success {}'.format(file))
+        else:
+            logger.info('new file | {} | {} | {}'.format(file, fileLink, file_hash))
+            bot.send_chat_action(chat_id=update.message.chat_id,
+                                 action=telegram.ChatAction.UPLOAD_DOCUMENT)
+            cc = update.message.reply_document(document=open(file, 'rb'),
+                                               timeout=120,
+                                               caption=file)
+            file_id = cc.document.file_id
+            update.message.reply_text(file_id)
+            logger.info('send success {}'.format(file))
+            file_size = os.path.getsize(file)
+            os.remove(file)
+            file_info = (file_hash, file, file_link,
+                         file_size, file_id)
+            connection = sqlite3.connect(db_path)
+            with connection:
+                connection.execute(sql_command_insert, file_info)
+    except sqlite3.IntegrityError:
+        logger.error('could not add twice {}'.format(file_info))
+        return True
+    except:
+        logger.exception('message')
+        return False
+    else:
+        return True
+
 class VK_Filter(BaseFilter):
 
     def filter(self, message):
@@ -162,47 +208,7 @@ def vk_send_file(bot, update, vk_url_list):
         for fnlvu in gg:
             file_list, vk_url = fnlvu
             for file in file_list:
-                try:
-                    file_hash = sha256Checksum(file)
-                    connection = sqlite3.connect(db_path)
-                    cursor = connection.cursor()
-                    cursor.execute(sql_command_chech_hash.format(file_hash))
-                    al_file_hash = cursor.fetchall()
-                    cursor.close()
-                    connection.close()
-                    if al_file_hash:
-                        logger.info(
-                            'already download file | {}'.format(al_file_hash))
-                        file_id = al_file_hash[0][0]
-                        bot.send_chat_action(chat_id=update.message.chat_id,
-                                             action=telegram.ChatAction.UPLOAD_DOCUMENT)
-                        cc = update.message.reply_document(document=file_id,
-                                                           timeout=120,
-                                                           caption=file)
-                        update.message.reply_text(file_id)
-                    else:
-                        bot.send_chat_action(chat_id=update.message.chat_id,
-                                             action=telegram.ChatAction.UPLOAD_DOCUMENT)
-                        cc = update.message.reply_document(document=open(file, 'rb'),
-                                                           timeout=120,
-                                                           caption=file)
-                        file_id = cc.document.file_id
-                        update.message.reply_text(file_id)
-                        file_link = vk_url
-                        file_size = os.path.getsize(file)
-                        os.remove(file)
-                        file_info = (file_hash, file, file_link,
-                                     file_size, file_id)
-                        connection = sqlite3.connect(db_path)
-                        with connection:
-                            connection.execute(sql_command_insert, file_info)
-                except sqlite3.IntegrityError:
-                    logger.error('could not add twice {}'.format(file_info))
-                except:
-                    logger.exception('message')
-                    continue
-                else:
-                    logger.info('send success {}'.format(file))
+                dealFileWithSqlAndBot(file, vk_url, db_path, bot, update)
     except:
         logger.exception('vk_send_file failed')
 
@@ -258,47 +264,7 @@ def wget_file_send(bot, update, args):
             logger.debug('file_name_list is {}'.format(file_name_list))
             for file in file_name_list:
                 logger.info('try send file {}'.format(file))
-                try:
-                    file_hash = sha256Checksum(file)
-                    connection = sqlite3.connect(db_path)
-                    cursor = connection.cursor()
-                    cursor.execute(sql_command_chech_hash.format(file_hash))
-                    al_file_hash = cursor.fetchall()
-                    cursor.close()
-                    connection.close()
-                    if al_file_hash:
-                        os.remove(file)
-                        logger.info(
-                            'already download file | {}'.format(al_file_hash))
-                        file_id = al_file_hash[0][0]
-                        bot.send_chat_action(chat_id=update.message.chat_id,
-                                             action=telegram.ChatAction.UPLOAD_DOCUMENT)
-                        cc = update.message.reply_document(document=file_id,
-                                                           timeout=120,
-                                                           caption=file)
-                        update.message.reply_text(file_id)
-                        logger.info('send success {}'.format(file))
-                    else:
-                        bot.send_chat_action(chat_id=update.message.chat_id,
-                                             action=telegram.ChatAction.UPLOAD_DOCUMENT)
-                        cc = update.message.reply_document(document=open(file, 'rb'),
-                                                           timeout=120,
-                                                           caption=file)
-                        file_id = cc.document.file_id
-                        update.message.reply_text(file_id)
-                        logger.info('send success {}'.format(file))
-                        file_link = i
-                        file_size = os.path.getsize(file)
-                        os.remove(file)
-                        file_info = (file_hash, file, file_link,
-                                     file_size, file_id)
-                        connection = sqlite3.connect(db_path)
-                        with connection:
-                            connection.execute(sql_command_insert, file_info)
-                except sqlite3.IntegrityError:
-                    logger.error('could not add twice {}'.format(file_info))
-                except:
-                    logger.exception('message')
+                dealFileWithSqlAndBot(file, i, db_path, bot, update)
         except CalledProcessError:
             logger.exception('wget return code error')
             update.message.reply_text('wget error')
@@ -327,18 +293,11 @@ def wechat_send_file(bot, update, wechat_url_list):
     for wechat_url in wechat_url_list:
         reqText = requests.get(wechat_url).text
         soup = bs4.BeautifulSoup(reqText, 'lxml')
-        filename = soup.title.text + '.pdf'
+        file = soup.title.text + '.pdf'
         htmlText = reqText.replace('data-src=', 'src=')
         html = HTML(string=htmlText)
-        html.write_pdf(filename)
-        bot.send_chat_action(chat_id=update.message.chat_id,
-                            action=telegram.ChatAction.UPLOAD_DOCUMENT)
-        cc = update.message.reply_document(document=open(filename, 'rb'),
-                                          timeout=120,
-                                          caption=filename)
-        file_id = cc.document.file_id
-        update.message.reply_text(file_id)
-        logger.info('send success {}'.format(filename))
+        html.write_pdf(file)
+        dealFileWithSqlAndBot(file, wechat_url, db_path, bot, update)
 
 
 def error(bot, update, error):
@@ -364,7 +323,6 @@ if __name__ == '__main__':
 
 # updater.stop()
 # updater, dp = (0, 0)
-
 
 
 
