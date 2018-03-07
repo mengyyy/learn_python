@@ -1,12 +1,14 @@
 #! /usr/bin/python3
 # -*- coding:utf-8 -*-
+# pip3 list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1  |
+# xargs -n1 pip3 install -U
 
 import telegram
 from telegram.ext import Updater
 from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 from telegram.ext import RegexHandler
-import logging
+import logzero
 import time
 import selenium
 from selenium import webdriver
@@ -14,6 +16,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.firefox.options import Options
 import subprocess
 import signal
 import json
@@ -32,14 +35,15 @@ checkin_log_path = '/home/Downloads/jd_jdc_{}.log'.format(log_time_str)
 screenshot_path = '/root/jd.png'
 sms_code = '0'
 
-dcap = dict(DesiredCapabilities.PHANTOMJS)
-dcap["phantomjs.page.settings.userAgent"] = \
-    "Mozilla/5.0 (Windows NT 5.1; rv:49.0) Gecko/20100101 Firefox/49.0"
-phantomjsPath = '/root/phantomjs-2.1.1-linux-x86_64/bin/phantomjs'
+# firefox
+geckodriver_path = '/home/Downloads/geckodriver'
+options = Options()
+options.add_argument("--headless")
+
 
 login_url = 'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fjr.jd.com%2F'
 checkin_url = 'https://jr.jd.com/'
-login_xpath = '//*[@id="content"]/div[2]/div[1]/div/div[3]/a'
+login_xpath = '//*[@id="content"]/div[2]/div[1]/div/div[3]'
 username_xpath = '//*[@id="loginname"]'
 passwd_xpath = '//*[@id="nloginpwd"]'
 login_click_xpath = '//*[@id="loginsubmit"]'
@@ -50,43 +54,32 @@ checkin_xpath = '//*[@id="primeWrap"]/div[1]/div[3]/div[1]/a/span'
 code_xpath = '//*[@id="code"]'
 submit_code_xpath = '//*[@id="submitBtn"]'
 
-
-logger = logging.getLogger('jd_checkin')
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-fh = logging.FileHandler(checkin_log_path)
-fh.setLevel(logging.DEBUG)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
-clear_phantomjs_cmd = 'ps ax | grep phantomjs | grep -v grep | cut -c 1-6 | xargs kill -9'
+logPath = '/home/Downloads/LOG/jd_check.log'
+logger = logzero.setup_logger(
+    'jd_checkin', logfile=logPath, maxBytes=2**20, backupCount=10)
 
 
-def start_driver():
-    driver = webdriver.PhantomJS(
-        executable_path=phantomjsPath, desired_capabilities=dcap)
-    wait = WebDriverWait(driver, 30)
+def start_driver(wait_time=10):
+    driver = webdriver.Firefox(
+        firefox_options=options, executable_path=geckodriver_path)
+    wait = WebDriverWait(driver, wait_time)
     driver.set_window_size(1280, 1024)
     return driver, wait
 
 
-def send_screenshot(bot, driver, ends=False):
+def driver_kill(driver):
+    try:
+        driver.quit()
+    except:
+        logger.exception('driver quit failed---')
+
+
+def send_screenshot(bot, driver):
+    logger.info('start send screenshot')
     try:
         ti = time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime())
         driver.save_screenshot(screenshot_path)
-        if ends:
-            # https://stackoverflow.com/a/38493285
-            driver.close()
-            driver.service.process.send_signal(signal.SIGTERM) # kill the specific phantomjs child proc
-            driver.quit()                                      # quit the node proc
-        bot.send_photo(chat_id=chat_id, 
+        bot.send_photo(chat_id=chat_id,
                        photo=open(screenshot_path, 'rb'),
                        timeout=60)
         bot.send_document(
@@ -96,7 +89,7 @@ def send_screenshot(bot, driver, ends=False):
             caption='{}'.format(ti),
             timeout=60)
     except Exception as e:
-        logger.exception('message')
+        logger.exception('send screenshot failed')
 
 
 def send_log(logger, bot, st):
@@ -173,7 +166,6 @@ def deal_checkin(driver, wait, bot):
         wait.until(EC.presence_of_element_located((By.XPATH, checkin_xpath)))
         status_text = driver.find_element_by_xpath(checkin_xpath).text
         send_log(logger, bot, 'checkined | {}'.format(status_text))
-        driver.find_element_by_xpath(checkin_xpath).click()
         time.sleep(5)
         driver.find_element_by_xpath(checkin_xpath).click()
     except BaseException as e:
@@ -181,13 +173,13 @@ def deal_checkin(driver, wait, bot):
     finally:
         if status_text != '今日已签':
             send_log(logger, bot, 'new checkin')
-            send_screenshot(bot, driver, ends=True)
-        
-        
+            send_screenshot(bot, driver)
+
+
 def jdc_do(bot, update):
     try:
-        driver, wait = start_driver()
         logger.debug('START (`\./`)')
+        driver, wait = start_driver()
         login_usrpwd(driver, wait, bot)
         if 'safe.jd.com' in driver.current_url:
             logger.debug('need sms code')
@@ -201,8 +193,7 @@ def jdc_do(bot, update):
     except Exception as e:
         logger.exception('message')
     finally:
-        del driver
-        subprocess.call(clear_phantomjs_cmd, shell=True)
+        driver_kill(driver)
 
 
 def callback_jd(bot, update, args, job_queue, chat_data):
@@ -225,9 +216,9 @@ def callback_jd(bot, update, args, job_queue, chat_data):
     else:
         try:
             job_interval = int(args[0])
-            if job_interval < 60:
-                update.message.reply_text('喵？喵？喵？ >=60S')
-                job_interval = 60
+            if job_interval < 3600:
+                update.message.reply_text('喵？喵？喵？ >=3600S')
+                job_interval = 3600
         except:
             update.message.reply_text('interval arg error')
         else:
@@ -269,4 +260,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
