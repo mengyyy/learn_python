@@ -20,6 +20,7 @@ client.send_message(clipBoardChat, message='test client')
 
 tg = 'https://t.me/testgroup'
 tc = 'https://t.me/testchannel'
+tc_plan = 'from | {from_id}\nmessage | {message}'
 
 idNum = 0
 while True:
