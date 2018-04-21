@@ -7,10 +7,11 @@ import logzero
 import subprocess
 import json
 import requests
+import time
 
-logger = logzero.setup_logger('get proxy')
+logger = logzero.setup_logger('get proxy', logfile='/home/Downloads/proxy.log')
 
-socks5Plan = 'socks5://{user}:{pass}@{server}:{port}'
+socks5Plan = 'socks5://{user}{pass}{server}:{port}'
 
 ssrProxy = 'socks5://127.0.0.1:1080'
 ssrProxies = {
@@ -20,13 +21,22 @@ ssrProxies = {
 
 
 ssrJsonPath = '/etc/sslocal.json'
-ssrCMD = 'python ~/shadowsocksr/shadowsocks/local.py -c {} -d restart'.format(
-    ssrJsonPath)
+ssrLogPath = '/home/Downloads/ss.log'
+
+ssrCMD = 'python ~/shadowsocksr/shadowsocks/local.py -c {} -d restart'.format(ssrJsonPath)
+
+# #!/bin/bash
+
+# pgrep ss-local | xargs kill -9
+# nohup ss-local -c /etc/sslocal.json -v &>>/home/Downloads/ss.log &
+ssrLibCMD = '/root/sslocal.sh'
+
 testIP_URL = 'http://httpbin.org/ip'
 
 
 def startSSR_Server():
     p = subprocess.Popen(ssrCMD, stdout=subprocess.PIPE, shell=True)
+    time.sleep(3)
     output, err = p.communicate()
     if not err:
         logger.info(output.decode('utf-8'))
@@ -36,6 +46,13 @@ def startSSR_Server():
         return False
 
 
+def startSSR_Server_lib():
+    p = subprocess.run(ssrLibCMD, shell=True)
+    time.sleep(3)
+    return True
+
+
+
 def testSProxy(proxies):
     try:
         req = requests.get(testIP_URL, proxies=proxies, timeout=10)
@@ -43,10 +60,10 @@ def testSProxy(proxies):
             logger.info(req.json())
             return True
     except requests.exceptions.ReadTimeout:
-        logger.exception('ssr server failed | timeout')
+        logger.exception('proxy test failed | timeout | {}'.format(proxies))
         return False
     except:
-        logger.exception('ssr server failed | timeout')
+        logger.exception('proxy test failed | other | {}'.format(proxies))
         return False
 
 def getSocksProxyFromTG(tgSocks5Link):
@@ -54,6 +71,12 @@ def getSocksProxyFromTG(tgSocks5Link):
     tgParseResult = urllib.parse.urlparse(tgSocks5Link)
     tgQueryList = urllib.parse.parse_qsl(tgParseResult.query)
     tgSocks5Info = {i[0]: i[1] for i in tgQueryList}
+    if tgSocks5Info.get('user', '') == '':
+        tgSocks5Info['user'] = ''
+        tgSocks5Info['pass'] = ''
+    else:
+        tgSocks5Info['user'] += ':'
+        tgSocks5Info['pass'] += '@'
     socksProxy = socks5Plan.format(**tgSocks5Info)
     proxies['http'] = socksProxy
     proxies['https'] = socksProxy
@@ -94,8 +117,10 @@ def genSSRJsonFromLink(ssrLink):
 
         ssrParseResult = urllib.parse.urlparse(ssrInfo_0[5])
         ssrQueryList = urllib.parse.parse_qs(ssrParseResult.query)
-
-        ssrParams['password'] = base64Decode(ssrParseResult.path[:-1])
+        if ssrQueryList:
+            ssrParams['password'] = base64Decode(ssrParseResult.path[:-1])
+        else:
+            ssrParams['password'] = base64Decode(ssrParseResult.path)
         ssrParams['obfs_param'] = base64Decode(
             ssrQueryList.get('obfsparam', [''])[0])
         ssrParams['protocol_param'] = base64Decode(
@@ -112,19 +137,12 @@ def genSSRJsonFromLink(ssrLink):
 
 def getSocksProxyFromSSRLink(ssrLink):
     if genSSRJsonFromLink(ssrLink):
-        if startSSR_Server():
+        # if startSSR_Server():
+        if startSSR_Server_lib():
             if testSProxy(ssrProxies):
-                logger.debug('tg proxy success | {}'.format(ssrLink))
+                logger.debug('ssr proxy success | {}'.format(ssrLink))
                 return ssrProxies
     else:
-        logger.debug('tg proxy failed | {}'.format(ssrLink))
+        logger.debug('ssr proxy failed | {}'.format(ssrLink))
         return None
-
-
-
-# tgSocks5Link = 'tg://socks?server=127.0.0.1&port=1080&user=user&pass=passwd'
-# Proxies = getSocksProxyFromTG(tgSocks5Link)
-
-# ssrLink = 'ssr://MTI3LjAuMC4xOjQ0MzphdXRoX2FlczEyOF9tZDU6YWVzLTEyOC1jZmI6dGxzMS4yX3RpY2tldF9hdXRoOmNHRnpjM2R2Y21RLz9vYmZzcGFyYW09YjJKbWMxOXdZWEpoYlEmcHJvdG9wYXJhbT1jSEp2ZEc5amIyeGZjR0Z5WVcwJnJlbWFya3M9Y21WdFlYSnJjdyZncm91cD1aM0p2ZFhB'
-# Proxies = getSocksProxyFromSSRLink(ssrLink)
 
