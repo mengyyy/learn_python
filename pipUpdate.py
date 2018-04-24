@@ -9,7 +9,7 @@ logger = logzero.logger
 
 checkCMD = 'pip3 list --outdate --format=json'
 updateCMDPlan = 'pip3 install -U {}'
-outputLogPlan = '{name:%10s} | {version} --> {latest_version}'
+outputLogPlan = '{name:10s} | {version} --> {latest_version}'
 
 p = subprocess.Popen(checkCMD, stdout=subprocess.PIPE, shell=True)
 output, err = p.communicate()
