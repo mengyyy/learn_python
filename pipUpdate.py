@@ -20,7 +20,7 @@ if not err:
         logger.info(outputLogPlan.format(**i))
         packageList.append(i['name'])
     for package in packageList :
-        updateCMD = updateCMDPlan.format(' '.join(package))
+        updateCMD = updateCMDPlan.format(package)
         p = subprocess.Popen(updateCMD, shell=True)
         output, err = p.communicate()
     else:
