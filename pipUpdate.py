@@ -19,8 +19,8 @@ if not err:
     for i in outputData:
         logger.info(outputLogPlan.format(**i))
         packageList.append(i['name'])
-    if len(packageList) > 0:
-        updateCMD = updateCMDPlan.format(' '.join(packageList))
+    for package in packageList :
+        updateCMD = updateCMDPlan.format(' '.join(package))
         p = subprocess.Popen(updateCMD, shell=True)
         output, err = p.communicate()
     else:
